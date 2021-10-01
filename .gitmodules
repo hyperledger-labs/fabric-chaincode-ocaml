@@ -1,0 +1,3 @@
+[submodule "fabric-protos"]
+	path = fabric-protos
+	url = git@github.com:hyperledger/fabric-protos.git

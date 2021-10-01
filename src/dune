@@ -1,0 +1,35 @@
+(library
+ (public_name fabric-chaincode-shim)
+ (name FabricChaincodeShim)
+ (libraries ocaml-protoc-plugin)
+ (preprocess (pps ppx_deriving.show ppx_deriving.ord ppx_deriving.eq))
+)
+
+; (rule
+;  (targets common.proto.piqi)
+;  (deps ../fabric-protos/common/common.proto)
+;  (action (run piqi of-proto -I ../fabric-protos/common common.proto))
+; )
+
+; (rule
+;  (targets common_piqi.ml)
+;  (deps ../google-protos/google/protobuf/timestamp.proto.piqi)
+;  (action (setenv OCAMLRUNPARAM b (run piqic-ocaml -I ../google-protos %{dep:common.proto.piqi})))
+; )
+
+(rule
+ (targets timestamp.ml common.ml policies.ml msp_principal.ml chaincode.ml chaincode_event.ml chaincode_shim.ml proposal.ml proposal_response.ml)
+ (deps (source_tree ../fabric-protos/) (source_tree ../google-protos/))
+ (action
+  (run protoc -I ../google-protos -I ../fabric-protos/  "--ocaml_opt=annot=[@@deriving show { with_path = false }, eq]" --ocaml_out=.
+       common/common.proto
+       common/policies.proto
+       ledger/queryresult/kv_query_result.proto
+       msp/msp_principal.proto
+       peer/chaincode.proto
+       peer/chaincode_event.proto
+       peer/chaincode_shim.proto
+       peer/proposal.proto
+       peer/proposal_response.proto
+       google/protobuf/timestamp.proto
+)))
