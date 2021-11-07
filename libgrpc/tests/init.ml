@@ -12,11 +12,11 @@ module Core = struct
   let () = print_endline (grpc_g_stands_for ())
 end
 
-let server = create_server ~listening:"localhost:30300" ()
+let server = Server.create ~listening:"localhost:50051" ()
 
 let () =
-  match wait_call ~timeout:2L server with
+  match Server.wait_call ~timeout:0L server with
   | TIMEOUT -> print_endline "wait_call timeout"
   | CALL _ -> print_endline "wait_call succeeded"
 
-let () = destroy_server server
+let () = Server.destroy server

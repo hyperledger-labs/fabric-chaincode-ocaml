@@ -1,0 +1,15 @@
+(executable
+ (name server)
+ (libraries grpc)
+  (modules server)
+)
+
+(executable
+ (name client)
+ (libraries grpc)
+  (modules client)
+)
+
+(cram
+  (deps ./server.exe ./client.exe)
+)

@@ -1,19 +1,20 @@
-   (library
-    (name GRPC)
-    (public_name grpc)
-    ; ctypes backward compatibility shims warn sometimes; suppress them
-    (flags (:standard -w -9-27))
-    (foreign_stubs (language c) (names grpc_stub))
-    (ctypes
-     (external_library_name grpc)
-     (build_flags_resolver pkg_config)
-     (headers (include "grpc/grpc.h"))
-     (type_description
-      (instance Type)
-      (functor Type_description))
-     (function_description
-;      (concurrency unlocked)
-      (instance Function)
-      (functor Function_description))
-     (generated_types Types_generated)
-     (generated_entry_point C)))
+(library
+ (name GRPC)
+ (public_name grpc)
+ (libraries memcpy)
+ ; ctypes backward compatibility shims warn sometimes; suppress them
+ (flags (:standard -w -9-27))
+ (foreign_stubs (language c) (names grpc_stub))
+ (ctypes
+  (external_library_name grpc)
+  (build_flags_resolver pkg_config)
+  (headers (include "grpc/grpc.h"))
+  (type_description
+   (instance Type)
+   (functor Type_description))
+  (function_description
+   ;      (concurrency unlocked)
+   (instance Function)
+   (functor Function_description))
+  (generated_types Types_generated)
+  (generated_entry_point C)))

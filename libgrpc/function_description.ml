@@ -83,12 +83,66 @@ module Functions (F : Ctypes.FOREIGN) = struct
 
   let grpc_server_request_call =
     foreign "grpc_server_request_call"
-      (ptr grpc_server
-      @-> ptr (ptr grpc_call)
-      @-> ptr GRPC_call_details.t @-> ptr GRPC_metadata_array.t
-      @-> ptr grpc_completion_queue @-> ptr grpc_completion_queue @-> ptr void
-      @-> returning GRPC_call_error.t)
+    @@ ptr grpc_server
+    @-> ptr (ptr grpc_call)
+    @-> ptr GRPC_call_details.t @-> ptr GRPC_metadata_array.t
+    @-> ptr grpc_completion_queue @-> ptr grpc_completion_queue @-> ptr void
+    @-> returning GRPC_call_error.t
 
   let grpc_call_error_to_string =
     foreign "grpc_call_error_to_string" (GRPC_call_error.t @-> returning string)
+
+  let grpc_insecure_channel_create =
+    foreign "grpc_insecure_channel_create"
+    @@ string @-> ptr_opt grpc_channel_args @-> reserved
+    @-> returning (ptr grpc_channel)
+
+  let grpc_channel_destroy =
+    foreign "grpc_channel_destroy" @@ ptr grpc_channel @-> returning void
+
+  let grpc_channel_create_call =
+    foreign "grpc_channel_create_call"
+    @@ ptr grpc_channel @-> ptr_opt grpc_call @-> uint32_t
+    @-> ptr grpc_completion_queue @-> GRPC_slice.t @-> ptr_opt GRPC_slice.t
+    @-> GPR_timespec.t @-> reserved
+    @-> returning (ptr grpc_call)
+
+  let grpc_call_start_batch =
+    foreign "grpc_call_start_batch"
+    @@ ptr grpc_call @-> ptr GRPC_op.t @-> size_t @-> tag @-> reserved
+    @-> returning GRPC_call_error.t
+
+  let grpc_slice_unref =
+    foreign "grpc_slice_unref" @@ GRPC_slice.t @-> returning void
+
+  let grpc_call_unref =
+    foreign "grpc_call_unref" @@ ptr grpc_call @-> returning void
+
+  let grpc_slice_buffer_init =
+    foreign "grpc_slice_buffer_init"
+    @@ ptr GRPC_slice_buffer.t @-> returning void
+
+  let grpc_slice_buffer_destroy =
+    foreign "grpc_slice_buffer_destroy"
+    @@ ptr GRPC_slice_buffer.t @-> returning void
+
+  let grpc_metadata_array_init =
+    foreign "grpc_metadata_array_init"
+    @@ ptr GRPC_metadata_array.t @-> returning void
+
+  let grpc_metadata_array_destroy =
+    foreign "grpc_metadata_array_destroy"
+    @@ ptr GRPC_metadata_array.t @-> returning void
+
+  let grpc_call_details_init =
+    foreign "grpc_call_details_init"
+    @@ ptr GRPC_call_details.t @-> returning void
+
+  let grpc_call_details_destroy =
+    foreign "grpc_call_details_destroy"
+    @@ ptr GRPC_call_details.t @-> returning void
+
+  let grpc_slice_buffer_add =
+    foreign "grpc_slice_buffer_add"
+    @@ ptr GRPC_slice_buffer.t @-> GRPC_slice.t @-> returning void
 end
