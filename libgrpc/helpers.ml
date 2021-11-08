@@ -71,20 +71,8 @@ module Metadata_array = struct
         let v = string_of_slice @@ getf m GRPC_metadata.value in
         (k, v) :: acc)
       metadatas []
-end
 
-module Ops = struct
-  type t =
-    | SEND_INITIAL_METADATA of (string * string) list
-    | SEND_MESSAGE of string
-    | SEND_CLOSE_FROM_CLIENT
-    | SEND_STATUS_FROM_SERVER
-    | RECV_INITIAL_METADATA of (string * string) list ref
-    | RECV_MESSAGE of string ref
-    | RECV_STATUS_ON_CLIENT
-    | RECV_CLOSE_ON_SERVER
-
-  let op_send_initial_metadata l =
+  let of_list ~dst_size ~dst_metadatas l =
     let len = List.length l in
     let metadatas = CArray.make GRPC_metadata.t len in
     List.iteri
@@ -95,16 +83,66 @@ module Ops = struct
         setf m GRPC_metadata.key k;
         setf m GRPC_metadata.value v)
       l;
+    dst_size <-@ Unsigned.Size_t.of_int len;
+    dst_metadatas <-@ CArray.start metadatas;
+    metadatas
+end
+
+module Ops = struct
+  type status_code = Types_generated.GRPC_status_code.t =
+    | GRPC_STATUS_OK
+    | GRPC_STATUS_CANCELLED
+    | GRPC_STATUS_UNKNOWN
+    | GRPC_STATUS_INVALID_ARGUMENT
+    | GRPC_STATUS_DEADLINE_EXCEEDED
+    | GRPC_STATUS_NOT_FOUND
+    | GRPC_STATUS_ALREADY_EXISTS
+    | GRPC_STATUS_PERMISSION_DENIED
+    | GRPC_STATUS_UNAUTHENTICATED
+    | GRPC_STATUS_RESOURCE_EXHAUSTED
+    | GRPC_STATUS_FAILED_PRECONDITION
+    | GRPC_STATUS_ABORTED
+    | GRPC_STATUS_OUT_OF_RANGE
+    | GRPC_STATUS_UNIMPLEMENTED
+    | GRPC_STATUS_INTERNAL
+    | GRPC_STATUS_UNAVAILABLE
+    | GRPC_STATUS_DATA_LOSS
+    | GRPC_STATUS__DO_NOT_USE
+
+  type t =
+    | SEND_INITIAL_METADATA of (string * string) list
+    | SEND_MESSAGE of string
+    | SEND_CLOSE_FROM_CLIENT
+    | SEND_STATUS_FROM_SERVER of {
+        trailing_metadata : (string * string) list;
+        status : status_code;
+        status_details : string option;
+      }
+    | RECV_INITIAL_METADATA of (string * string) list ref
+    | RECV_MESSAGE of string ref
+    | RECV_STATUS_ON_CLIENT of {
+        trailing_metadata : (string * string) list ref;
+        status : status_code ref;
+        status_details : string ref;
+      }
+    | RECV_CLOSE_ON_SERVER of { cancelled : bool ref }
+
+  let op_send_initial_metadata l =
     let op = make GRPC_op.t in
     setf op GRPC_op.op GRPC_op_type.GRPC_OP_SEND_INITIAL_METADATA;
     let initial =
       getf (getf op GRPC_op.data) GRPC_op.Data.send_initial_metadata
     in
-    setf initial GRPC_op.Data.Send_initial_metadata.metadata
-      (CArray.start metadatas);
-    setf initial GRPC_op.Data.Send_initial_metadata.count
-      (Unsigned.Size_t.of_int len);
-    (op, fun () -> ())
+    let metadatas =
+      Metadata_array.of_list
+        ~dst_size:(initial @. GRPC_op.Data.Send_initial_metadata.count)
+        ~dst_metadatas:(initial @. GRPC_op.Data.Send_initial_metadata.metadata)
+        l
+    in
+    ( op,
+      fun () ->
+        Cstubs_internals.use_value op;
+        Cstubs_internals.use_value metadatas )
 
   let op_recv_initial_metadata r =
     let op = make GRPC_op.t in
@@ -115,6 +153,8 @@ module Ops = struct
     setf recv GRPC_op.Data.Recv_initial_metadata.recv_initial_metadata
       (addr metadata_array);
     let filler () =
+      Cstubs_internals.use_value op;
+
       r := Metadata_array.to_list metadata_array;
       grpc_metadata_array_destroy (addr metadata_array)
     in
@@ -127,7 +167,7 @@ module Ops = struct
     setf op GRPC_op.op GRPC_op_type.GRPC_OP_SEND_MESSAGE;
     let initial = getf (getf op GRPC_op.data) GRPC_op.Data.send_message in
     setf initial GRPC_op.Data.Send_message.send_message (addr send_message);
-    (op, fun () -> ())
+    (op, fun () -> Cstubs_internals.use_value op)
 
   let op_recv_message rmsg =
     let op = make GRPC_op.t in
@@ -136,8 +176,78 @@ module Ops = struct
     let recv = getf (getf op GRPC_op.data) GRPC_op.Data.recv_message in
     setf recv GRPC_op.Data.Recv_message.recv_message recv_message;
     let filler () =
+      Cstubs_internals.use_value op;
       rmsg := Byte_buffer.to_string !@(!@recv_message);
       grpc_byte_buffer_destroy !@recv_message
+    in
+    (op, filler)
+
+  let op_send_close_from_client () =
+    let op = make GRPC_op.t in
+    setf op GRPC_op.op GRPC_op_type.GRPC_OP_SEND_CLOSE_FROM_CLIENT;
+    (op, fun () -> Cstubs_internals.use_value op)
+
+  let op_send_status_from_server ~trailing_metadata ~status ~status_details =
+    let op = make GRPC_op.t in
+    setf op GRPC_op.op GRPC_op_type.GRPC_OP_SEND_STATUS_FROM_SERVER;
+    let data =
+      getf (getf op GRPC_op.data) GRPC_op.Data.send_status_from_server
+    in
+    let metadatas =
+      Metadata_array.of_list
+        ~dst_size:
+          (data @. GRPC_op.Data.Send_status_from_server.trailing_metadata_count)
+        ~dst_metadatas:
+          (data @. GRPC_op.Data.Send_status_from_server.trailing_metadata)
+        trailing_metadata
+    in
+    setf data GRPC_op.Data.Send_status_from_server.status status;
+    let status_details =
+      Option.map (fun sd -> slice_of_string sd) status_details
+    in
+    let status_details_ptr = Option.map addr status_details in
+    setf data GRPC_op.Data.Send_status_from_server.status_details
+      status_details_ptr;
+    ( op,
+      fun () ->
+        Cstubs_internals.use_value op;
+        Cstubs_internals.use_value metadatas;
+        Cstubs_internals.use_value status_details )
+
+  let op_recv_status_on_client ~trailing_metadata ~status ~status_details =
+    let op = make GRPC_op.t in
+    setf op GRPC_op.op GRPC_op_type.GRPC_OP_RECV_STATUS_ON_CLIENT;
+    let metadata_array = make GRPC_metadata_array.t in
+    grpc_metadata_array_init (addr metadata_array);
+    let recv = getf (getf op GRPC_op.data) GRPC_op.Data.recv_status_on_client in
+    setf recv GRPC_op.Data.Recv_status_on_client.trailing_metadata
+      (addr metadata_array);
+    let rstatus = allocate_n GRPC_status_code.t ~count:1 in
+    setf recv GRPC_op.Data.Recv_status_on_client.status rstatus;
+    let rstatus_details = make GRPC_slice.t in
+    setf recv GRPC_op.Data.Recv_status_on_client.status_details
+      (addr rstatus_details);
+    let filler () =
+      Cstubs_internals.use_value op;
+      trailing_metadata := Metadata_array.to_list metadata_array;
+      grpc_metadata_array_destroy (addr metadata_array);
+      status := !@rstatus;
+      status_details := string_of_slice rstatus_details;
+      Option.iter
+        (fun p -> gpr_free (to_voidp p))
+        (getf recv GRPC_op.Data.Recv_status_on_client.error_string)
+    in
+    (op, filler)
+
+  let op_recv_close_on_server ~cancelled =
+    let op = make GRPC_op.t in
+    setf op GRPC_op.op GRPC_op_type.GRPC_OP_RECV_CLOSE_ON_SERVER;
+    let recv_cancelled = allocate_n int ~count:1 in
+    let recv = getf (getf op GRPC_op.data) GRPC_op.Data.recv_close_on_server in
+    setf recv GRPC_op.Data.Recv_close_on_server.cancelled recv_cancelled;
+    let filler () =
+      Cstubs_internals.use_value op;
+      cancelled := not (Int.equal !@recv_cancelled 0)
     in
     (op, filler)
 
@@ -146,9 +256,12 @@ module Ops = struct
     | RECV_INITIAL_METADATA r -> op_recv_initial_metadata r
     | SEND_MESSAGE msg -> op_send_message msg
     | RECV_MESSAGE rmsg -> op_recv_message rmsg
-    | SEND_CLOSE_FROM_CLIENT | SEND_STATUS_FROM_SERVER | RECV_STATUS_ON_CLIENT
-    | RECV_CLOSE_ON_SERVER ->
-        assert false
+    | SEND_CLOSE_FROM_CLIENT -> op_send_close_from_client ()
+    | SEND_STATUS_FROM_SERVER { trailing_metadata; status; status_details } ->
+        op_send_status_from_server ~trailing_metadata ~status ~status_details
+    | RECV_STATUS_ON_CLIENT { trailing_metadata; status; status_details } ->
+        op_recv_status_on_client ~trailing_metadata ~status ~status_details
+    | RECV_CLOSE_ON_SERVER { cancelled } -> op_recv_close_on_server ~cancelled
 end
 
 module Call = struct

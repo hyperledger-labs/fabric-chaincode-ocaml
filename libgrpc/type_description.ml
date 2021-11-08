@@ -452,7 +452,7 @@ module Types (F : Ctypes.TYPE) = struct
 
         let status = field t "status" GRPC_status_code.t
 
-        let status_detals = field t "status_details" (ptr_opt GRPC_slice.t)
+        let status_details = field t "status_details" (ptr_opt GRPC_slice.t)
 
         let () = seal t
       end

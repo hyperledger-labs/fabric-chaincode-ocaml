@@ -8,7 +8,7 @@
  (ctypes
   (external_library_name grpc)
   (build_flags_resolver pkg_config)
-  (headers (include "grpc/grpc.h"))
+  (headers (include "grpc/grpc.h" "grpc/support/alloc.h"))
   (type_description
    (instance Type)
    (functor Type_description))
