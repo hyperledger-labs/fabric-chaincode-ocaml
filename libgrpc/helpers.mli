@@ -23,6 +23,8 @@ module Op : sig
     | GRPC_STATUS_DATA_LOSS
     | GRPC_STATUS__DO_NOT_USE
 
+  val show_status_code : status_code -> string
+
   type t =
     | SEND_INITIAL_METADATA of (string * string) list
     | SEND_MESSAGE of string

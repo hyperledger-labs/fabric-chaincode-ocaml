@@ -13,9 +13,8 @@ let () =
   print_endline "wait_call 2 succeeded";
   Printf.printf "msg: %s\n" msg;
   let> () = send_message "Yes, I feel very connected"
-  and> cancelled = recv_close_on_server ()
+  and> () = send_status_from_server GRPC_STATUS_OK
   and> () = timeout 5L in
-  print_endline "wait_call 3 succeeded";
-  Printf.printf "cancelled: %b" cancelled
+  print_endline "wait_call 3 succeeded"
 
 let () = Server.destroy server

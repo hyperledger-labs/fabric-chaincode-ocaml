@@ -12,9 +12,10 @@ let () =
   print_endline "wait_call succeeded";
   List.iter (fun (k, v) -> Printf.printf "%s:%s\n" k v) metadatas;
   let> msg = recv_message ()
-  and> () = send_close_from_client
+  and> close = recv_status_on_client ()
   and> () = timeout 4L in
   print_endline "wait_call 2 succeeded";
-  Printf.printf "msg: %s\n" msg
+  Printf.printf "msg: %s\n" msg;
+  Printf.printf "status: %s\n" (Op.show_status_code close.status)
 
 let () = Client.destroy client

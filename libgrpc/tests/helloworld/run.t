@@ -5,7 +5,6 @@
   wait_call 2 succeeded
   msg: Are you happy?
   wait_call 3 succeeded
-  cancelled: true
 
   $ sleep 1
 
@@ -14,5 +13,6 @@
   caml-grcp:bye
   wait_call 2 succeeded
   msg: Yes, I feel very connected
+  status: GRPC_STATUS_OK
 
   $ wait
