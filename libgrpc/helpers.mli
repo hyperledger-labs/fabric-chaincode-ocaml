@@ -1,3 +1,7 @@
+exception QUEUE_SHUTDOWN
+
+exception TIMEOUT
+
 module Ops : sig
   type t =
     | SEND_INITIAL_METADATA of (string * string) list
@@ -13,9 +17,7 @@ end
 module Call : sig
   type t
 
-  type send_opt = TIMEOUT | OK
-
-  val send_ops : ?timeout:int64 -> t -> Ops.t list -> send_opt
+  val send_ops : ?timeout:int64 -> t -> Ops.t list -> unit
 
   val destroy_call : t -> unit
 end
@@ -27,13 +29,11 @@ module Server : sig
 
   val destroy : t -> unit
 
-  type wait_call =
-    | TIMEOUT
-    | CALL of {
-        call : Call.t;
-        details : Core.GRPC_call_details.t Ctypes.structure;
-        metadatas : (string * string) list;
-      }
+  type wait_call = {
+    call : Call.t;
+    details : Core.GRPC_call_details.t Ctypes.structure;
+    metadatas : (string * string) list;
+  }
 
   val wait_call : ?timeout:int64 -> t -> wait_call
 end

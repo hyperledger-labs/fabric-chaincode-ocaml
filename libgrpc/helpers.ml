@@ -14,6 +14,8 @@ let mk_timespec ?(sec = Int64.max_int) ?(nsec = Int32.zero) () =
 
 exception QUEUE_SHUTDOWN
 
+exception TIMEOUT
+
 module Slice_buffer = struct
   let to_string sb =
     let len = Unsigned.Size_t.to_int @@ getf sb GRPC_slice_buffer.length in
@@ -155,8 +157,6 @@ module Call = struct
     cq : grpc_completion_queue structure ptr;
   }
 
-  type send_opt = TIMEOUT | OK
-
   let send_ops ?timeout call ops =
     let ops, filler = List.split @@ List.map Ops.to_grpc ops in
     let ops_len = Unsigned.Size_t.of_int @@ List.length ops in
@@ -169,10 +169,8 @@ module Call = struct
         let grpc_event = grpc_completion_queue_next call.cq deadline null in
         match getf grpc_event GRPC_event.type_ with
         | GRPC_QUEUE_SHUTDOWN -> raise QUEUE_SHUTDOWN
-        | GRPC_QUEUE_TIMEOUT -> TIMEOUT
-        | GRPC_OP_COMPLETE ->
-            List.iter (fun f -> f ()) filler;
-            OK)
+        | GRPC_QUEUE_TIMEOUT -> raise TIMEOUT
+        | GRPC_OP_COMPLETE -> List.iter (fun f -> f ()) filler)
     | e -> invalid_arg (grpc_call_error_to_string e)
 
   let destroy_call call =
@@ -200,13 +198,11 @@ module Server = struct
     grpc_server_cancel_all_calls server.server;
     grpc_server_destroy server.server
 
-  type wait_call =
-    | TIMEOUT
-    | CALL of {
-        call : Call.t;
-        details : GRPC_call_details.t structure;
-        metadatas : (string * string) list;
-      }
+  type wait_call = {
+    call : Call.t;
+    details : GRPC_call_details.t structure;
+    metadatas : (string * string) list;
+  }
 
   let wait_call ?timeout server =
     let call = allocate_n (ptr grpc_call) ~count:1 in
@@ -226,15 +222,14 @@ module Server = struct
         in
         match getf grpc_event GRPC_event.type_ with
         | GRPC_QUEUE_SHUTDOWN -> raise QUEUE_SHUTDOWN
-        | GRPC_QUEUE_TIMEOUT -> TIMEOUT
+        | GRPC_QUEUE_TIMEOUT -> raise TIMEOUT
         | GRPC_OP_COMPLETE ->
             let call = !@call in
-            CALL
-              {
-                call = { call; cq = cq_call };
-                details;
-                metadatas = Metadata_array.to_list metadatas;
-              })
+            {
+              call = { call; cq = cq_call };
+              details;
+              metadatas = Metadata_array.to_list metadatas;
+            })
     | e -> invalid_arg (grpc_call_error_to_string e)
 end
 
