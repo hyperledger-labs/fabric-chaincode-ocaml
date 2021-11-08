@@ -145,4 +145,8 @@ module Functions (F : Ctypes.FOREIGN) = struct
   let grpc_slice_buffer_add =
     foreign "grpc_slice_buffer_add"
     @@ ptr GRPC_slice_buffer.t @-> GRPC_slice.t @-> returning void
+
+  let grpc_byte_buffer_destroy =
+    foreign "grpc_byte_buffer_destroy"
+    @@ ptr GRPC_byte_buffer.t @-> returning void
 end

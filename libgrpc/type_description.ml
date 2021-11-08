@@ -315,7 +315,7 @@ module Types (F : Ctypes.TYPE) = struct
 
         let compression = field t "compression" GRPC_compression_algorithm.t
 
-        let slive_buffer = field t "slice_buffer" GRPC_slice_buffer.t
+        let slice_buffer = field t "slice_buffer" GRPC_slice_buffer.t
 
         let () = seal t
       end
@@ -324,6 +324,10 @@ module Types (F : Ctypes.TYPE) = struct
 
       let () = seal t
     end
+
+    let data = field t "data" Data.t
+
+    let () = seal t
   end
 
   module GRPC_status_code = struct
@@ -429,7 +433,7 @@ module Types (F : Ctypes.TYPE) = struct
 
         let t : t structure typ = structure "grpc_op_send_message"
 
-        let send_message = field t "send_message" GRPC_byte_buffer.t
+        let send_message = field t "send_message" (ptr GRPC_byte_buffer.t)
 
         let () = seal t
       end

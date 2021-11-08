@@ -1,6 +1,6 @@
 open GRPC
 
-let client = Client.create ~target:"localhost:50052" ()
+let client = Client.create ~target:"unix:socket" ()
 
 let () =
   let call = Client.call ~meth:"hello" client in
@@ -10,6 +10,7 @@ let () =
       [
         Ops.SEND_INITIAL_METADATA [ ("caml-grcp", "hello") ];
         Ops.RECV_INITIAL_METADATA metadatas;
+        Ops.SEND_MESSAGE "Are you happy?";
       ]
   with
   | TIMEOUT -> print_endline "wait_call timeout"

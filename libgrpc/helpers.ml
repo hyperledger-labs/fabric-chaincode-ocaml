@@ -38,6 +38,23 @@ module Slice_buffer = struct
     grpc_slice_buffer_add dst (slice_of_string s)
 end
 
+module Byte_buffer = struct
+  let to_string sb =
+    Slice_buffer.to_string
+      (getf
+         (getf (getf sb GRPC_byte_buffer.data) GRPC_byte_buffer.Data.raw)
+         GRPC_byte_buffer.Data.Compressed_buffer.slice_buffer)
+
+  let of_string ~dst s =
+    setf dst GRPC_byte_buffer.type_ GRPC_BB_RAW;
+    let raw = getf (getf dst GRPC_byte_buffer.data) GRPC_byte_buffer.Data.raw in
+    setf raw GRPC_byte_buffer.Data.Compressed_buffer.compression
+      GRPC_COMPRESS_NONE;
+    Slice_buffer.of_string
+      ~dst:(raw @. GRPC_byte_buffer.Data.Compressed_buffer.slice_buffer)
+      s
+end
+
 module Metadata_array = struct
   let to_list (metadata_array : GRPC_metadata_array.t structure) =
     let len = getf metadata_array GRPC_metadata_array.count in
@@ -57,11 +74,11 @@ end
 module Ops = struct
   type t =
     | SEND_INITIAL_METADATA of (string * string) list
-    | SEND_MESSAGE
+    | SEND_MESSAGE of string
     | SEND_CLOSE_FROM_CLIENT
     | SEND_STATUS_FROM_SERVER
     | RECV_INITIAL_METADATA of (string * string) list ref
-    | RECV_MESSAGE
+    | RECV_MESSAGE of string ref
     | RECV_STATUS_ON_CLIENT
     | RECV_CLOSE_ON_SERVER
 
@@ -101,11 +118,34 @@ module Ops = struct
     in
     (op, filler)
 
+  let op_send_message msg =
+    let send_message = make GRPC_byte_buffer.t in
+    Byte_buffer.of_string ~dst:send_message msg;
+    let op = make GRPC_op.t in
+    setf op GRPC_op.op GRPC_op_type.GRPC_OP_SEND_MESSAGE;
+    let initial = getf (getf op GRPC_op.data) GRPC_op.Data.send_message in
+    setf initial GRPC_op.Data.Send_message.send_message (addr send_message);
+    (op, fun () -> ())
+
+  let op_recv_message rmsg =
+    let op = make GRPC_op.t in
+    setf op GRPC_op.op GRPC_op_type.GRPC_OP_RECV_MESSAGE;
+    let recv_message = allocate_n (ptr GRPC_byte_buffer.t) ~count:1 in
+    let recv = getf (getf op GRPC_op.data) GRPC_op.Data.recv_message in
+    setf recv GRPC_op.Data.Recv_message.recv_message recv_message;
+    let filler () =
+      rmsg := Byte_buffer.to_string !@(!@recv_message);
+      grpc_byte_buffer_destroy !@recv_message
+    in
+    (op, filler)
+
   let to_grpc = function
     | SEND_INITIAL_METADATA l -> op_send_initial_metadata l
     | RECV_INITIAL_METADATA r -> op_recv_initial_metadata r
-    | SEND_MESSAGE | SEND_CLOSE_FROM_CLIENT | SEND_STATUS_FROM_SERVER
-    | RECV_MESSAGE | RECV_STATUS_ON_CLIENT | RECV_CLOSE_ON_SERVER ->
+    | SEND_MESSAGE msg -> op_send_message msg
+    | RECV_MESSAGE rmsg -> op_recv_message rmsg
+    | SEND_CLOSE_FROM_CLIENT | SEND_STATUS_FROM_SERVER | RECV_STATUS_ON_CLIENT
+    | RECV_CLOSE_ON_SERVER ->
         assert false
 end
 
