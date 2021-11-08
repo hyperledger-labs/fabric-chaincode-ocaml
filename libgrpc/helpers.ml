@@ -469,7 +469,7 @@ module Server = struct
     grpc_server_cancel_all_calls server.server;
     grpc_server_destroy server.server
 
-  type wait_call = {
+  type received_call = {
     call : Call.t;
     method_ : string;
     host : string;
@@ -509,6 +509,16 @@ module Server = struct
               metadatas = Metadata_array.to_list metadatas;
             })
     | e -> invalid_arg (grpc_call_error_to_string e)
+
+  let simple_rpc c f =
+    let open (val Call.o c.call) in
+    let> msg = recv_message () in
+    let rsp = f msg in
+    let> () = send_initial_metadata []
+    and> _ = recv_close_on_server ()
+    and> () = send_message rsp
+    and> () = send_status_from_server GRPC_STATUS_OK in
+    ()
 end
 
 module Client = struct
@@ -532,4 +542,15 @@ module Client = struct
     in
     grpc_slice_unref meth;
     { Call.call; cq }
+
+  let simple_rpc ~meth ?timeout c msg =
+    let c = call ~meth ?timeout c in
+    let open (val Call.o c) in
+    let> () = send_initial_metadata []
+    and> () = send_message msg
+    and> () = send_close_from_client in
+    let> _ = recv_initial_metadata ()
+    and> rcp = recv_message ()
+    and> _ = recv_status_on_client () in
+    rcp
 end

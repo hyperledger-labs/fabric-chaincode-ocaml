@@ -97,14 +97,16 @@ module Server : sig
 
   val destroy : t -> unit
 
-  type wait_call = {
+  type received_call = {
     call : Call.t;
     method_ : string;
     host : string;
     metadatas : (string * string) list;
   }
 
-  val wait_call : ?timeout:int64 -> t -> wait_call
+  val wait_call : ?timeout:int64 -> t -> received_call
+
+  val simple_rpc : received_call -> (string -> string) -> unit
 end
 
 module Client : sig
@@ -117,4 +119,6 @@ module Client : sig
   type call_result = TIMEOUT | CALL
 
   val call : meth:string -> ?timeout:int64 -> t -> Call.t
+
+  val simple_rpc : meth:string -> ?timeout:int64 -> t -> string -> string
 end

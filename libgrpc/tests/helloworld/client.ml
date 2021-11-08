@@ -19,3 +19,11 @@ let () =
   Printf.printf "status: %s\n" (Op.show_status_code close.status)
 
 let () = Client.destroy client
+
+let client = Client.create ~target:"unix:socket" ()
+
+let () =
+  let rsp = Client.simple_rpc ~meth:"hello" ~timeout:4L client "Hi!" in
+  print_endline rsp
+
+let () = Client.destroy client
