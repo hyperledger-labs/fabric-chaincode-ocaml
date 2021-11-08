@@ -1,0 +1,4 @@
+(test
+ (name conversion)
+ (libraries fabric-chaincode-shim ocaml-protoc-plugin)
+)
