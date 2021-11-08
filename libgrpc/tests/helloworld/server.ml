@@ -5,6 +5,7 @@ let server = Server.create ~listening:"unix:socket" ()
 let () =
   let c = Server.wait_call ~timeout:5L server in
   print_endline "wait_call succeeded";
+  Printf.printf "method:%s\nhost:%s\n" c.method_ c.host;
   List.iter (fun (k, v) -> Printf.printf "%s:%s\n" k v) c.metadatas;
   let open (val Call.o c.call) in
   let> () = send_initial_metadata [ ("caml-grcp", "bye") ]

@@ -99,7 +99,8 @@ module Server : sig
 
   type wait_call = {
     call : Call.t;
-    details : Core.GRPC_call_details.t Ctypes.structure;
+    method_ : string;
+    host : string;
     metadatas : (string * string) list;
   }
 

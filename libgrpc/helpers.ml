@@ -471,7 +471,8 @@ module Server = struct
 
   type wait_call = {
     call : Call.t;
-    details : GRPC_call_details.t structure;
+    method_ : string;
+    host : string;
     metadatas : (string * string) list;
   }
 
@@ -496,9 +497,15 @@ module Server = struct
         | GRPC_QUEUE_TIMEOUT -> raise TIMEOUT
         | GRPC_OP_COMPLETE ->
             let call = !@call in
+            let method_ =
+              string_of_slice @@ getf details GRPC_call_details.method_
+            in
+            let host = string_of_slice @@ getf details GRPC_call_details.host in
+            grpc_call_details_destroy (addr details);
             {
               call = { call; cq = cq_call };
-              details;
+              method_;
+              host;
               metadatas = Metadata_array.to_list metadatas;
             })
     | e -> invalid_arg (grpc_call_error_to_string e)
