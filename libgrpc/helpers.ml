@@ -88,7 +88,7 @@ module Metadata_array = struct
     metadatas
 end
 
-module Ops = struct
+module Op = struct
   type status_code = Types_generated.GRPC_status_code.t =
     | GRPC_STATUS_OK
     | GRPC_STATUS_CANCELLED
@@ -271,7 +271,7 @@ module Call = struct
   }
 
   let send_ops ?timeout call ops =
-    let ops, filler = List.split @@ List.map Ops.to_grpc ops in
+    let ops, filler = List.split @@ List.map Op.to_grpc ops in
     let ops_len = Unsigned.Size_t.of_int @@ List.length ops in
     let ops = CArray.of_list GRPC_op.t ops in
     let deadline = mk_timespec ?sec:timeout () in
@@ -289,6 +289,144 @@ module Call = struct
   let destroy_call call =
     grpc_call_unref call.call;
     grpc_completion_queue_destroy call.cq
+
+  module type O = sig
+    type 'a t
+
+    val send_initial_metadata : (string * string) list -> unit t
+
+    val send_message : string -> unit t
+
+    val send_close_from_client : unit t
+
+    val send_status_from_server :
+      ?trailing_metadata:(string * string) list ->
+      ?status_details:string ->
+      Op.status_code ->
+      unit t
+
+    val recv_initial_metadata : unit -> (string * string) list t
+
+    val recv_message : unit -> string t
+
+    type status_on_client = {
+      trailing_metadata : (string * string) list;
+      status : Op.status_code;
+      status_details : string;
+    }
+
+    val recv_status_on_client : unit -> status_on_client t
+
+    val recv_close_on_server : unit -> bool t
+
+    val timeout : int64 -> unit t
+
+    val ( let> ) : 'a t -> ('a -> 'b) -> 'b
+
+    val ( and> ) : 'a t -> 'b t -> ('a * 'b) t
+  end
+
+  let o call =
+    let module M = struct
+      type 'a t = { ops : Op.t list; reader : unit -> 'a; timeout : int64 }
+
+      let send_initial_metadata l =
+        {
+          timeout = Int64.max_int;
+          ops = [ Op.SEND_INITIAL_METADATA l ];
+          reader = (fun () -> ());
+        }
+
+      let send_message s =
+        {
+          timeout = Int64.max_int;
+          ops = [ Op.SEND_MESSAGE s ];
+          reader = (fun () -> ());
+        }
+
+      let send_close_from_client =
+        {
+          timeout = Int64.max_int;
+          ops = [ Op.SEND_CLOSE_FROM_CLIENT ];
+          reader = (fun () -> ());
+        }
+
+      let send_status_from_server ?(trailing_metadata = []) ?status_details
+          status =
+        {
+          timeout = Int64.max_int;
+          ops =
+            [
+              Op.SEND_STATUS_FROM_SERVER
+                { trailing_metadata; status_details; status };
+            ];
+          reader = (fun () -> ());
+        }
+
+      let recv_initial_metadata () =
+        let l = ref [] in
+        {
+          timeout = Int64.max_int;
+          ops = [ Op.RECV_INITIAL_METADATA l ];
+          reader = (fun () -> !l);
+        }
+
+      let recv_message () =
+        let l = ref "" in
+        {
+          timeout = Int64.max_int;
+          ops = [ Op.RECV_MESSAGE l ];
+          reader = (fun () -> !l);
+        }
+
+      type status_on_client = {
+        trailing_metadata : (string * string) list;
+        status : Op.status_code;
+        status_details : string;
+      }
+
+      let recv_status_on_client () =
+        let trailing_metadata = ref [] in
+        let status = ref Op.GRPC_STATUS__DO_NOT_USE in
+        let status_details = ref "" in
+        {
+          timeout = Int64.max_int;
+          ops =
+            [
+              Op.RECV_STATUS_ON_CLIENT
+                { trailing_metadata; status; status_details };
+            ];
+          reader =
+            (fun () ->
+              {
+                trailing_metadata = !trailing_metadata;
+                status = !status;
+                status_details = !status_details;
+              });
+        }
+
+      let recv_close_on_server () =
+        let cancelled = ref false in
+        {
+          timeout = Int64.max_int;
+          ops = [ Op.RECV_CLOSE_ON_SERVER { cancelled } ];
+          reader = (fun () -> !cancelled);
+        }
+
+      let timeout timeout = { timeout; ops = []; reader = (fun () -> ()) }
+
+      let ( let> ) ops f =
+        send_ops ~timeout:ops.timeout call ops.ops;
+        f (ops.reader ())
+
+      let ( and> ) ops1 ops2 =
+        {
+          timeout = Int64.min ops1.timeout ops2.timeout;
+          ops = ops1.ops @ ops2.ops;
+          reader = (fun () -> (ops1.reader (), ops2.reader ()));
+        }
+    end in
+    (module M : O)
 end
 
 module Server = struct

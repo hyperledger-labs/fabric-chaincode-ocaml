@@ -2,7 +2,7 @@ exception QUEUE_SHUTDOWN
 
 exception TIMEOUT
 
-module Ops : sig
+module Op : sig
   type status_code = Types_generated.GRPC_status_code.t =
     | GRPC_STATUS_OK
     | GRPC_STATUS_CANCELLED
@@ -45,9 +45,47 @@ end
 module Call : sig
   type t
 
-  val send_ops : ?timeout:int64 -> t -> Ops.t list -> unit
+  val send_ops : ?timeout:int64 -> t -> Op.t list -> unit
 
   val destroy_call : t -> unit
+
+  module type O = sig
+    type 'a t
+
+    val send_initial_metadata : (string * string) list -> unit t
+
+    val send_message : string -> unit t
+
+    val send_close_from_client : unit t
+
+    val send_status_from_server :
+      ?trailing_metadata:(string * string) list ->
+      ?status_details:string ->
+      Op.status_code ->
+      unit t
+
+    val recv_initial_metadata : unit -> (string * string) list t
+
+    val recv_message : unit -> string t
+
+    type status_on_client = {
+      trailing_metadata : (string * string) list;
+      status : Op.status_code;
+      status_details : string;
+    }
+
+    val recv_status_on_client : unit -> status_on_client t
+
+    val recv_close_on_server : unit -> bool t
+
+    val timeout : int64 -> unit t
+
+    val ( let> ) : 'a t -> ('a -> 'b) -> 'b
+
+    val ( and> ) : 'a t -> 'b t -> ('a * 'b) t
+  end
+
+  val o : t -> (module O)
 end
 
 module Server : sig
