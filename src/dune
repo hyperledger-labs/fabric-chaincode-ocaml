@@ -19,7 +19,7 @@
 
 (rule
  (targets timestamp.ml common.ml policies.ml msp_principal.ml chaincode.ml chaincode_event.ml chaincode_shim.ml proposal.ml proposal_response.ml)
- (deps (source_tree ../fabric-protos/) (source_tree ../google-protos/))
+ (deps (source_tree ../fabric-protos/) (source_tree ../google-protos/) (package ocaml-protoc-plugin))
  (action
   (run protoc -I ../google-protos -I ../fabric-protos/  "--ocaml_opt=annot=[@@deriving show { with_path = false }, eq]" --ocaml_out=.
        common/common.proto

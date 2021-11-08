@@ -14,7 +14,7 @@ let () =
   print_endline "wait_call 2 succeeded";
   Printf.printf "msg: %s\n" msg;
   let> () = send_message "Yes, I feel very connected"
-  and> () = send_status_from_server GRPC_STATUS_OK
+  and> () = send_status_from_server ()
   and> () = timeout 5L in
   print_endline "wait_call 3 succeeded"
 

@@ -15,7 +15,6 @@
   caml-grcp:bye
   wait_call 2 succeeded
   msg: Yes, I feel very connected
-  status: GRPC_STATUS_OK
   I'm happy that you said "Hi!"
 
   $ wait

@@ -1,6 +1,7 @@
 type ('req, 'rep) service =
-  (module Ocaml_protoc_plugin.Service.Message with type t = 'req)
-  * (module Ocaml_protoc_plugin.Service.Message with type t = 'rep)
+  (module Ocaml_protoc_plugin__.Service.Rpc
+     with type Request.t = 'req
+      and type Response.t = 'rep)
 
 module Server : sig
   val simple_rpc :
@@ -9,10 +10,5 @@ end
 
 module Client : sig
   val simple_rpc :
-    GRPC.Client.t ->
-    meth:string ->
-    ?timeout:int64 ->
-    ('req, 'rep) service ->
-    'req ->
-    'rep
+    GRPC.Client.t -> ?timeout:int64 -> ('req, 'rep) service -> 'req -> 'rep
 end
