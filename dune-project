@@ -19,3 +19,9 @@
  (depends ctypes)
  (synopsis "Binding to libgrpc core")
 )
+
+(package
+ (name grpc-protoc-plugin)
+ (depends ctypes grpc ocaml-protoc-plugin)
+ (synopsis "GRPC services using ocaml-protoc-plugin definitions")
+)

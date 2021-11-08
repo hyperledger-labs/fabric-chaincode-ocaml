@@ -1,0 +1,5 @@
+(library
+ (public_name grpc-protoc-plugin)
+ (name GRPC_protoc_plugin)
+ (libraries grpc ocaml-protoc-plugin)
+)

@@ -1,0 +1,30 @@
+(executable
+ (name server)
+ (libraries grpc helloworld grpc-protoc-plugin)
+ (modules server)
+)
+
+(executable
+ (name client)
+ (libraries grpc helloworld grpc-protoc-plugin)
+ (modules client)
+)
+
+(cram
+  (deps ./server.exe ./client.exe)
+)
+
+
+(library
+ (name helloworld)
+ (modules helloworld)
+ (libraries ocaml-protoc-plugin)
+)
+
+(rule
+ (targets helloworld.ml)
+ (deps helloworld.proto)
+ (action
+  (run protoc  "--ocaml_opt=annot=[@@deriving show { with_path = false }, eq]" --ocaml_out=.
+       helloworld.proto
+)))
