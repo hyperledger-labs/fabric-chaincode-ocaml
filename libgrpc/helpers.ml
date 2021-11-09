@@ -150,6 +150,15 @@ module Op = struct
 
   exception STATUS_ERROR of status_code_error * string
 
+  let () =
+    Printexc.register_printer (function
+      | STATUS_ERROR (sc, s) ->
+          Some
+            (Printf.sprintf "GRPC:STATUS_ERROR(%s,%S)"
+               (show_status_code_error sc)
+               s)
+      | _ -> None)
+
   type t =
     | SEND_INITIAL_METADATA of (string * string) list
     | SEND_MESSAGE of string
@@ -562,7 +571,7 @@ module Server = struct
             })
     | e -> invalid_arg (grpc_call_error_to_string e)
 
-  let simple_rpc c f =
+  let unary_rpc c f =
     let open (val Call.o c.call) in
     let> msg = recv_message () in
     let rsp = f msg in
@@ -570,6 +579,49 @@ module Server = struct
     and> _ = recv_close_on_server ()
     and> () = send_message rsp
     and> () = send_status_from_server () in
+    ()
+
+  type server_stream = string -> unit
+
+  type client_stream = unit -> string
+
+  let client_stream_rpc c (f : client_stream -> string) =
+    let open (val Call.o c.call) in
+    let client_stream () =
+      let> msg = recv_message () in
+      msg
+    in
+    let> () = send_initial_metadata [] in
+    let rsp = f client_stream in
+    let> _ = recv_close_on_server ()
+    and> () = send_message rsp
+    and> () = send_status_from_server () in
+    ()
+
+  let server_stream_rpc c f =
+    let open (val Call.o c.call) in
+    let server_stream msg =
+      let> msg = send_message msg in
+      ()
+    in
+    let> msg = recv_message () and> () = send_initial_metadata [] in
+    f msg server_stream;
+    let> _ = recv_close_on_server () and> () = send_status_from_server () in
+    ()
+
+  let bidirectional_rpc c f =
+    let open (val Call.o c.call) in
+    let client_stream () =
+      let> msg = recv_message () in
+      msg
+    in
+    let server_stream msg =
+      let> msg = send_message msg in
+      ()
+    in
+    let> () = send_initial_metadata [] in
+    f client_stream server_stream;
+    let> _ = recv_close_on_server () and> () = send_status_from_server () in
     ()
 end
 
@@ -595,7 +647,7 @@ module Client = struct
     grpc_slice_unref meth;
     { Call.call; cq }
 
-  let simple_rpc ~meth ?timeout c msg =
+  let unary_rpc ~meth ?timeout c msg =
     let c = call ~meth ?timeout c in
     let open (val Call.o c) in
     let> () = send_initial_metadata []
@@ -605,4 +657,54 @@ module Client = struct
     and> rcp = recv_message ()
     and> status = recv_status_on_client () in
     rcp
+
+  type client_stream = string -> unit
+
+  type server_stream = unit -> string
+
+  let client_stream_rpc ~meth ?timeout c (f : client_stream -> unit) =
+    let c = call ~meth ?timeout c in
+    let open (val Call.o c) in
+    let client_stream msg =
+      let> () = send_message msg in
+      ()
+    in
+    let> () = send_initial_metadata [] and> _ = recv_initial_metadata () in
+    f client_stream;
+    let> () = send_close_from_client
+    and> rcp = recv_message ()
+    and> status = recv_status_on_client () in
+    rcp
+
+  let server_stream_rpc ~meth ?timeout c msg (f : server_stream -> 'a) : 'a =
+    let c = call ~meth ?timeout c in
+    let open (val Call.o c) in
+    let server_stream () =
+      let> msg = recv_message () in
+      msg
+    in
+    let> () = send_initial_metadata []
+    and> () = send_message msg
+    and> _ = recv_initial_metadata ()
+    and> () = send_close_from_client in
+    let r = f server_stream in
+    let> _ = recv_status_on_client () in
+    r
+
+  let bidirectional_rpc ~meth ?timeout c
+      (f : client_stream -> server_stream -> 'a) : 'a =
+    let c = call ~meth ?timeout c in
+    let open (val Call.o c) in
+    let client_stream msg =
+      let> () = send_message msg in
+      ()
+    in
+    let server_stream () =
+      let> msg = recv_message () in
+      msg
+    in
+    let> () = send_initial_metadata [] and> _ = recv_initial_metadata () in
+    let r = f client_stream server_stream in
+    let> () = send_close_from_client and> _ = recv_status_on_client () in
+    r
 end

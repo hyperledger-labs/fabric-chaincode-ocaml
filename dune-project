@@ -10,7 +10,9 @@
  (name fabric-chaincode-shim)
  (depends ocaml-protoc-plugin
           ppx_deriving
-          libgrpc)
+          libgrpc
+          conf-protoc
+          )
  (synopsis "Shim for implementing Hypeledger Fabric chaincode in OCaml")
 )
 

@@ -8,7 +8,11 @@ let server = Server.create ~listening ()
 let () =
   let c = Server.wait_call ~timeout:5L server in
   print_endline c.method_;
-  GRPC_protoc_plugin.Server.simple_rpc c Helloworld.Helloworld.Greeter.sayHello'
-    (fun name -> Printf.sprintf "Hello %s" name)
+  GRPC_protoc_plugin.Server.(
+    serve c
+      [
+        unary_rpc Helloworld.Helloworld.Greeter.sayHello' (fun name ->
+            Printf.sprintf "Hello %s" name);
+      ])
 
 let () = Server.destroy server

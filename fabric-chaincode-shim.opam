@@ -7,6 +7,7 @@ depends: [
   "ocaml-protoc-plugin"
   "ppx_deriving"
   "libgrpc"
+  "conf-protoc"
   "odoc" {with-doc}
 ]
 build: [

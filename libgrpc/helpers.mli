@@ -106,7 +106,19 @@ module Server : sig
 
   val wait_call : ?timeout:int64 -> t -> received_call
 
-  val simple_rpc : received_call -> (string -> string) -> unit
+  val unary_rpc : received_call -> (string -> string) -> unit
+
+  type server_stream = string -> unit
+
+  type client_stream = unit -> string
+
+  val client_stream_rpc : received_call -> (client_stream -> string) -> unit
+
+  val server_stream_rpc :
+    received_call -> (string -> server_stream -> unit) -> unit
+
+  val bidirectional_rpc :
+    received_call -> (client_stream -> server_stream -> unit) -> unit
 end
 
 module Client : sig
@@ -120,5 +132,22 @@ module Client : sig
 
   val call : meth:string -> ?timeout:int64 -> t -> Call.t
 
-  val simple_rpc : meth:string -> ?timeout:int64 -> t -> string -> string
+  val unary_rpc : meth:string -> ?timeout:int64 -> t -> string -> string
+
+  type client_stream = string -> unit
+
+  type server_stream = unit -> string
+
+  val client_stream_rpc :
+    meth:string -> ?timeout:int64 -> t -> (client_stream -> unit) -> string
+
+  val server_stream_rpc :
+    meth:string -> ?timeout:int64 -> t -> string -> (server_stream -> 'a) -> 'a
+
+  val bidirectional_rpc :
+    meth:string ->
+    ?timeout:int64 ->
+    t ->
+    (client_stream -> server_stream -> 'a) ->
+    'a
 end

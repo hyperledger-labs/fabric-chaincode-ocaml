@@ -1,0 +1,28 @@
+(executable
+ (name server)
+ (libraries grpc echo grpc-protoc-plugin)
+ (modules server)
+)
+
+(executable
+ (name client)
+ (libraries grpc echo grpc-protoc-plugin)
+ (modules client)
+)
+
+(cram
+  (deps ./server.exe ./client.exe)
+)
+
+
+(library
+ (name echo)
+ (modules echo)
+ (libraries ocaml-protoc-plugin)
+)
+
+(rule
+ (targets echo.ml)
+ (deps echo.proto (package ocaml-protoc-plugin))
+ (action (run protoc --ocaml_out=. echo.proto ))
+)

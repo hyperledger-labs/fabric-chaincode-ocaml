@@ -6,7 +6,7 @@ let client = Client.create ~target ()
 
 let () =
   let rsp =
-    GRPC_protoc_plugin.Client.simple_rpc ~timeout:4L client
+    GRPC_protoc_plugin.Client.unary_rpc ~timeout:4L client
       Helloworld.Helloworld.Greeter.sayHello' "Client"
   in
   print_endline rsp

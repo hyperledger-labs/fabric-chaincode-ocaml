@@ -25,7 +25,7 @@ let server = Server.create ~listening:"unix:socket" ()
 let () =
   let c = Server.wait_call ~timeout:5L server in
   assert (c.method_ = "hello");
-  Server.simple_rpc c (fun msg ->
+  Server.unary_rpc c (fun msg ->
       Printf.sprintf "I'm happy that you said %S" msg)
 
 let () = Server.destroy server

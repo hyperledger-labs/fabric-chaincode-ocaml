@@ -25,6 +25,5 @@
  (targets helloworld.ml)
  (deps helloworld.proto (package ocaml-protoc-plugin))
  (action
-  (run protoc  "--ocaml_opt=annot=[@@deriving show { with_path = false }, eq]" --ocaml_out=.
-       helloworld.proto
-)))
+  (run protoc --ocaml_out=. helloworld.proto))
+)
