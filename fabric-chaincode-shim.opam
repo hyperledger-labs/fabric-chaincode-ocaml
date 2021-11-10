@@ -8,6 +8,8 @@ depends: [
   "ppx_deriving"
   "libgrpc"
   "conf-protoc"
+  "grpc"
+  "grpc-protoc-plugin"
   "odoc" {with-doc}
 ]
 build: [

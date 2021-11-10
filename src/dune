@@ -1,7 +1,7 @@
 (library
  (public_name fabric-chaincode-shim)
  (name FabricChaincodeShim)
- (libraries ocaml-protoc-plugin)
+ (libraries grpc-protoc-plugin ocaml-protoc-plugin grpc)
  (preprocess (pps ppx_deriving.show ppx_deriving.ord ppx_deriving.eq))
 )
 

@@ -695,15 +695,20 @@ module Client = struct
       (f : client_stream -> server_stream -> 'a) : 'a =
     let c = call ~meth ?timeout c in
     let open (val Call.o c) in
+    let first = ref true in
     let client_stream msg =
-      let> () = send_message msg in
-      ()
+      if !first then
+        let> () = send_message msg and> _ = recv_initial_metadata () in
+        first := false
+      else
+        let> () = send_message msg in
+        ()
     in
     let server_stream () =
       let> msg = recv_message () in
       msg
     in
-    let> () = send_initial_metadata [] and> _ = recv_initial_metadata () in
+    let> () = send_initial_metadata [] in
     let r = f client_stream server_stream in
     let> () = send_close_from_client and> _ = recv_status_on_client () in
     r

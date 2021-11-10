@@ -1,4 +1,12 @@
 (test
  (name conversion)
+ (modules conversion)
  (libraries fabric-chaincode-shim ocaml-protoc-plugin)
+)
+
+(executable
+ (name test)
+ (modules test)
+ (libraries fabric-chaincode-shim)
+
 )

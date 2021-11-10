@@ -12,6 +12,8 @@
           ppx_deriving
           libgrpc
           conf-protoc
+          grpc
+          grpc-protoc-plugin
           )
  (synopsis "Shim for implementing Hypeledger Fabric chaincode in OCaml")
 )
