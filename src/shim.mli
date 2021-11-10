@@ -10,6 +10,10 @@ end
 
 val getFunctionAndParams : stub -> string * string list
 
+val getState : stub -> string -> string
+
+val putState : stub -> key:string -> value:string -> unit
+
 val loop :
   id_name:string ->
   target:string ->

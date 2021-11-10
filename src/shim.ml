@@ -10,7 +10,13 @@ module Response = struct
     Proposal_response.Response.make ~status:400 ?message ()
 end
 
-type stub = { payload : string }
+type stub = {
+  payload : string;
+  from_server : unit -> Chaincode_shim.ChaincodeMessage.t;
+  to_server : Chaincode_shim.ChaincodeMessage.t -> unit;
+  txid : string;
+  channel_id : string;
+}
 
 let getFunctionAndParams stub =
   match
@@ -23,9 +29,63 @@ let getFunctionAndParams stub =
       invalid_arg
         ("FunctionAndParams: " ^ Ocaml_protoc_plugin.Result.show_error s)
 
-let mk_stub msg = { payload = msg.Chaincode_shim.ChaincodeMessage.payload }
+let getState stub key =
+  let payload =
+    Chaincode_shim.GetState.make ~key ()
+    |> Chaincode_shim.GetState.to_proto |> Ocaml_protoc_plugin.Writer.contents
+  in
+  let msg =
+    Chaincode_shim.ChaincodeMessage.make ~type':GET_STATE ~payload
+      ~txid:stub.txid ~channel_id:stub.channel_id ()
+  in
+  stub.to_server msg;
+  Format.printf "GetState %s@." key;
+  let rcp = stub.from_server () in
+  Format.printf "Message received %a@." Chaincode_shim.ChaincodeMessage.pp rcp;
+  assert (rcp.type' = Chaincode_shim.ChaincodeMessage.Type.RESPONSE);
+  assert (rcp.txid = stub.txid);
+  assert (rcp.channel_id = stub.channel_id);
+  rcp.payload
 
-let loop ~id_name ~target ~init:_ ~invoke =
+let putState stub ~key ~value =
+  let payload =
+    Chaincode_shim.PutState.make ~key ~value ()
+    |> Chaincode_shim.PutState.to_proto |> Ocaml_protoc_plugin.Writer.contents
+  in
+  let msg =
+    Chaincode_shim.ChaincodeMessage.make ~type':PUT_STATE ~payload
+      ~txid:stub.txid ~channel_id:stub.channel_id ()
+  in
+  stub.to_server msg;
+  Format.printf "PutState %s<-%s@." key value;
+  let rcp = stub.from_server () in
+  Format.printf "Message received %a@." Chaincode_shim.ChaincodeMessage.pp rcp;
+  assert (rcp.type' = Chaincode_shim.ChaincodeMessage.Type.RESPONSE);
+  assert (rcp.txid = stub.txid);
+  assert (rcp.channel_id = stub.channel_id);
+  assert (rcp.payload = "")
+
+let mk_stub ~txid ~channel_id from_server to_server msg =
+  {
+    payload = msg.Chaincode_shim.ChaincodeMessage.payload;
+    from_server;
+    to_server;
+    txid;
+    channel_id;
+  }
+
+let call rcps msgs (rcp : Chaincode_shim.ChaincodeMessage.t) f =
+  let stub = mk_stub ~txid:rcp.txid ~channel_id:rcp.channel_id rcps msgs rcp in
+  let response = f stub in
+  let payload =
+    response |> Proposal_response.Response.to_proto
+    |> Ocaml_protoc_plugin.Writer.contents
+  in
+  msgs
+    (Chaincode_shim.ChaincodeMessage.make ~type':COMPLETED ~payload
+       ~txid:rcp.txid ~channel_id:rcp.channel_id ())
+
+let loop ~id_name ~target ~init ~invoke =
   let client = GRPC.Client.create ~target () in
   Format.printf "Call@.";
   GRPC_protoc_plugin.Client.bidirectional_rpc client
@@ -39,19 +99,13 @@ let loop ~id_name ~target ~init:_ ~invoke =
             Format.printf "msg:Register received by client!@.";
             assert false
         | REGISTERED -> Format.printf "msg:Register@."
-        | INIT -> Format.printf "msg:Init: %a@." ChaincodeMessage.pp rcp
+        | INIT ->
+            Format.printf "msg:Init: %a@." ChaincodeMessage.pp rcp;
+            call rcps msgs rcp init
         | READY -> Format.printf "msg:Register@."
         | TRANSACTION ->
             Format.printf "msg:Transaction@.";
-            let stub = mk_stub rcp in
-            let response = invoke stub in
-            let payload =
-              response |> Proposal_response.Response.to_proto
-              |> Ocaml_protoc_plugin.Writer.contents
-            in
-            msgs
-              (Chaincode_shim.ChaincodeMessage.make ~type':COMPLETED ~payload
-                 ~txid:rcp.txid ~channel_id:rcp.channel_id ())
+            call rcps msgs rcp invoke
         | UNDEFINED | COMPLETED | ERROR | GET_STATE | PUT_STATE | DEL_STATE
         | INVOKE_CHAINCODE | RESPONSE | GET_STATE_BY_RANGE | GET_QUERY_RESULT
         | QUERY_STATE_NEXT | QUERY_STATE_CLOSE | KEEPALIVE | GET_HISTORY_FOR_KEY
