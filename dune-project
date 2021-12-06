@@ -4,13 +4,13 @@
 (using ctypes 0.1)
 
 (authors "François Bobot")
-
+(maintainers "François Bobot")
+(source (github bobot/fabric-chaincode-ocaml))
 
 (package
  (name fabric-chaincode-shim)
  (depends ocaml-protoc-plugin
           ppx_deriving
-          libgrpc
           conf-protoc
           grpc
           grpc-protoc-plugin
