@@ -1,5 +1,5 @@
 [submodule "fabric-protos"]
-	path = fabric-protos
+	path = fabric-chaincode-shim/fabric-protos
 	url = git@github.com:hyperledger/fabric-protos.git
 [submodule "ocaml-protoc-plugin"]
 	path = ocaml-protoc-plugin
