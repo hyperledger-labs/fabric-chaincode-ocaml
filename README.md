@@ -30,3 +30,15 @@ git clone https://github.com/bobot/fabric-chaincode-ocaml.git
 cd fabric-chaincode-ocaml
 opam install --deps-only .
 ```
+
+## Hyperledger Fabric Development mode
+
+The script `./fabric-chaincode-shim/tests/peer-chaincode-devmode.sh TMPDIR`
+start a shell after starting an hyperledger fabric in development mode. Don't
+forget to remove the temporary directory before restarting it. then inside the
+new shell a test using the OCaml shim can be started with:
+
+```
+dune exec -- fabric-chaincode-shim/tests/test.exe 127.0.0.1:7052 &
+CORE_PEER_ADDRESS=127.0.0.1:7051 peer chaincode invoke -o 127.0.0.1:7050 -C ch1 -n mycc -c '{"Args":["query","a"]}'
+```
