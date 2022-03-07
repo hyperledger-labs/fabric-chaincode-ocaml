@@ -3,4 +3,4 @@
 	url = git@github.com:hyperledger/fabric-protos.git
 [submodule "ocaml-protoc-plugin"]
 	path = ocaml-protoc-plugin
-	url = git@github.com:Nymphium/ocaml-protoc-plugin.git
+	url = git@github.com:bobot/ocaml-protoc-plugin.git
