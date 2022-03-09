@@ -1,6 +1,6 @@
 [submodule "fabric-protos"]
 	path = fabric-chaincode-shim/fabric-protos
-	url = git@github.com:hyperledger/fabric-protos.git
+	url = https://github.com/hyperledger/fabric-protos.git
 [submodule "ocaml-protoc-plugin"]
 	path = ocaml-protoc-plugin
-	url = git@github.com:bobot/ocaml-protoc-plugin.git
+	url = https://github.com/bobot/ocaml-protoc-plugin.git
