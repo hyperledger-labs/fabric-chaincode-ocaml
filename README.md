@@ -17,13 +17,7 @@ using a submodule.
 
 # Installation in development mode
 
-    The repository uses unreleased features of dune 3.0, in order to install it:
-
-```
-opam pin "https://github.com/ocaml/dune.git" --with-version=3.0
-```
-
-    The installation of the different dependencies is done in the repository using opam 2.1 with:
+The installation of the different dependencies is done in the repository using opam 2.1 with:
 
 ```
 git clone https://github.com/bobot/fabric-chaincode-ocaml.git

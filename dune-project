@@ -20,7 +20,7 @@
 
  (package
  (name grpc)
- (depends ctypes)
+ (depends ctypes memcpy dune-configurator conf-pkg-config)
  (synopsis "Binding to libgrpc core")
 )
 

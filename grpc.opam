@@ -8,6 +8,9 @@ bug-reports: "https://github.com/bobot/fabric-chaincode-ocaml/issues"
 depends: [
   "dune" {>= "3.0"}
   "ctypes"
+  "memcpy"
+  "dune-configurator"
+  "conf-pkg-config"
   "odoc" {with-doc}
 ]
 build: [
