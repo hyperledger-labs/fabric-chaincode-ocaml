@@ -20,6 +20,7 @@ cd fabric
 # Additional change configuration
 sed -i sampleconfig/core.yaml sampleconfig/orderer.yaml -e "s&/var/hyperledger/production&$PWD/../tmp/&g"
 sed -i sampleconfig/core.yaml -e "s&127.0.0.1:9443&127.0.0.1:9447&g"
+sed -i sampleconfig/core.yaml -e "s&0.0.0.0:7051&127.0.0.1:7051&g"
 
 # 2 -- Build
 make orderer peer configtxgen
