@@ -15,14 +15,13 @@ let () =
   and> _ = recv_status_on_client ()
   and> () = timeout 4L in
   print_endline "wait_call 2 succeeded";
-  Printf.printf "msg: %s\n" msg
+  Printf.printf "msg: %s\n" (Option.value ~default:"None" msg)
 
 let () = Client.destroy client
-
 let client = Client.create ~target:"unix:socket" ()
 
 let () =
   let rsp = Client.unary_rpc ~meth:"hello" ~timeout:4L client "Hi!" in
-  print_endline rsp
+  print_endline (Result.get_ok rsp)
 
 let () = Client.destroy client

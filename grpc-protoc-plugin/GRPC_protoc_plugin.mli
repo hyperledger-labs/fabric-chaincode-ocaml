@@ -10,8 +10,7 @@ module Server : sig
   val unary_rpc : ('req, 'rep, no, no) service -> ('req -> 'rep) -> registered
 
   type 'rep server_stream = 'rep -> unit
-
-  type 'req client_stream = unit -> 'req
+  type 'req client_stream = unit -> 'req option
 
   val client_stream_rpc :
     ('req, 'rep, yes, no) service -> ('req client_stream -> 'rep) -> registered
@@ -36,8 +35,7 @@ module Client : sig
     'rep
 
   type 'req client_stream = 'req -> unit
-
-  type 'rep server_stream = unit -> 'rep
+  type 'rep server_stream = unit -> 'rep option
 
   val client_stream_rpc :
     ?timeout:int64 ->
@@ -52,12 +50,12 @@ module Client : sig
     ('req, 'rep, no, yes) service ->
     'req ->
     ('rep server_stream -> 'a) ->
-    'a
+    'a * GRPC__Helpers.Status_on_client.t
 
   val bidirectional_rpc :
     ?timeout:int64 ->
     GRPC.Client.t ->
     ('req, 'rep, yes, yes) service ->
     ('req client_stream -> 'rep server_stream -> 'a) ->
-    'a
+    'a * GRPC__Helpers.Status_on_client.t
 end

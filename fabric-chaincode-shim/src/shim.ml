@@ -12,7 +12,7 @@ end
 
 type stub = {
   payload : string;
-  from_server : unit -> Chaincode_shim.ChaincodeMessage.t;
+  from_server : unit -> Chaincode_shim.ChaincodeMessage.t option;
   to_server : Chaincode_shim.ChaincodeMessage.t -> unit;
   txid : string;
   channel_id : string;
@@ -29,6 +29,15 @@ let getFunctionAndParams stub =
       invalid_arg
         ("FunctionAndParams: " ^ Ocaml_protoc_plugin.Result.show_error s)
 
+exception SERVER_STREAM_STOPPED
+
+let get_response rcp =
+  match rcp with
+  | None ->
+      Format.printf "Stream stopped unexpectedly@.";
+      raise SERVER_STREAM_STOPPED
+  | Some rcp -> rcp
+
 let getState stub key =
   let payload =
     Chaincode_shim.GetState.make ~key ()
@@ -40,7 +49,7 @@ let getState stub key =
   in
   stub.to_server msg;
   Format.printf "GetState %s@." key;
-  let rcp = stub.from_server () in
+  let rcp = get_response @@ stub.from_server () in
   Format.printf "Message received %a@." Chaincode_shim.ChaincodeMessage.pp rcp;
   assert (rcp.type' = Chaincode_shim.ChaincodeMessage.Type.RESPONSE);
   assert (rcp.txid = stub.txid);
@@ -58,7 +67,7 @@ let putState stub ~key ~value =
   in
   stub.to_server msg;
   Format.printf "PutState %s<-%s@." key value;
-  let rcp = stub.from_server () in
+  let rcp = get_response @@ stub.from_server () in
   Format.printf "Message received %a@." Chaincode_shim.ChaincodeMessage.pp rcp;
   assert (rcp.type' = Chaincode_shim.ChaincodeMessage.Type.RESPONSE);
   assert (rcp.txid = stub.txid);
@@ -88,35 +97,48 @@ let call rcps msgs (rcp : Chaincode_shim.ChaincodeMessage.t) f =
 let loop ~id_name ~target ~init ~invoke =
   let client = GRPC.Client.create ~target () in
   Format.printf "Call@.";
-  GRPC_protoc_plugin.Client.bidirectional_rpc client
-    Chaincode_shim.ChaincodeSupport.register' (fun msgs rcps ->
-      let rec loop () =
-        Format.printf "loop@.";
-        let rcp = rcps () in
-        let open Chaincode_shim in
-        (match rcp.type' with
-        | REGISTER ->
-            Format.printf "msg:Register received by client!@.";
-            assert false
-        | REGISTERED -> Format.printf "msg:Register@."
-        | INIT ->
-            Format.printf "msg:Init: %a@." ChaincodeMessage.pp rcp;
-            call rcps msgs rcp init
-        | READY -> Format.printf "msg:Register@."
-        | TRANSACTION ->
-            Format.printf "msg:Transaction@.";
-            call rcps msgs rcp invoke
-        | UNDEFINED | COMPLETED | ERROR | GET_STATE | PUT_STATE | DEL_STATE
-        | INVOKE_CHAINCODE | RESPONSE | GET_STATE_BY_RANGE | GET_QUERY_RESULT
-        | QUERY_STATE_NEXT | QUERY_STATE_CLOSE | KEEPALIVE | GET_HISTORY_FOR_KEY
-        | GET_STATE_METADATA | PUT_STATE_METADATA | GET_PRIVATE_DATA_HASH ->
-            Format.printf "msg:%a@." ChaincodeMessage.pp rcp);
-        loop ()
-      in
-      Format.printf "Register@.";
-      let payload =
-        Chaincode.ChaincodeID.make ~name:id_name ()
-        |> Chaincode.ChaincodeID.to_proto |> Ocaml_protoc_plugin.Writer.contents
-      in
-      msgs (Chaincode_shim.ChaincodeMessage.make ~type':REGISTER ~payload ());
-      loop ())
+  let (), status =
+    GRPC_protoc_plugin.Client.bidirectional_rpc client
+      Chaincode_shim.ChaincodeSupport.register' (fun msgs rcps ->
+        let rec loop () =
+          Format.printf "loop@.";
+          let rcp = rcps () in
+          let open Chaincode_shim in
+          match rcp with
+          | None -> Format.printf "msg:CONNECTION CLOSING@."
+          | Some rcp -> (
+              let handle () =
+                match rcp.type' with
+                | REGISTER ->
+                    Format.printf "msg:Register received by client!@.";
+                    assert false
+                | REGISTERED -> Format.printf "msg:Registered@."
+                | INIT ->
+                    Format.printf "msg:Init: %a@." ChaincodeMessage.pp rcp;
+                    call rcps msgs rcp init
+                | READY -> Format.printf "msg:Ready@."
+                | TRANSACTION ->
+                    Format.printf "msg:Transaction@.";
+                    call rcps msgs rcp invoke
+                | UNDEFINED | COMPLETED | ERROR | GET_STATE | PUT_STATE
+                | DEL_STATE | INVOKE_CHAINCODE | RESPONSE | GET_STATE_BY_RANGE
+                | GET_QUERY_RESULT | QUERY_STATE_NEXT | QUERY_STATE_CLOSE
+                | KEEPALIVE | GET_HISTORY_FOR_KEY | GET_STATE_METADATA
+                | PUT_STATE_METADATA | GET_PRIVATE_DATA_HASH ->
+                    Format.printf "msg:%a@." ChaincodeMessage.pp rcp
+              in
+              match handle () with
+              | exception SERVER_STREAM_STOPPED -> ()
+              | () -> loop ())
+        in
+        Format.printf "Register@.";
+        let payload =
+          Chaincode.ChaincodeID.make ~name:id_name ()
+          |> Chaincode.ChaincodeID.to_proto
+          |> Ocaml_protoc_plugin.Writer.contents
+        in
+        msgs (Chaincode_shim.ChaincodeMessage.make ~type':REGISTER ~payload ());
+        loop ())
+  in
+  Format.printf "error status: %a@." GRPC.Status_on_client.pp status;
+  exit 1

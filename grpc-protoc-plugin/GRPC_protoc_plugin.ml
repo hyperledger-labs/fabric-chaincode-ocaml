@@ -1,8 +1,7 @@
 let from_proto_stream from_proto msgs () =
-  (fun msg ->
-    let msg = Ocaml_protoc_plugin.Reader.create msg in
-    let msg = Result.get_ok (from_proto msg) in
-    msg)
+  (Option.map (fun msg ->
+       let msg = Ocaml_protoc_plugin.Reader.create msg in
+       Result.get_ok (from_proto msg)))
     (msgs ())
 
 let to_proto_stream to_proto rcps rcp =
@@ -42,8 +41,7 @@ module Server = struct
             to_proto rcp |> Ocaml_protoc_plugin.Writer.contents))
 
   type 'rep server_stream = 'rep -> unit
-
-  type 'req client_stream = unit -> 'req
+  type 'req client_stream = unit -> 'req option
 
   let client_stream_rpc conv f =
     register conv (fun call from_proto to_proto ->
@@ -77,11 +75,11 @@ module Client = struct
       GRPC.Client.unary_rpc t ~meth ?timeout
         (to_proto msg |> Ocaml_protoc_plugin.Writer.contents)
     in
-    rcp |> Ocaml_protoc_plugin.Reader.create |> from_proto |> Result.get_ok
+    rcp |> Result.get_ok |> Ocaml_protoc_plugin.Reader.create |> from_proto
+    |> Result.get_ok
 
   type 'req client_stream = 'req -> unit
-
-  type 'rep server_stream = unit -> 'rep
+  type 'rep server_stream = unit -> 'rep option
 
   let client_stream_rpc ?timeout t conv (f : _ client_stream -> unit) =
     let meth, to_proto, from_proto =
@@ -89,7 +87,8 @@ module Client = struct
     in
     let f msgs = f (to_proto_stream to_proto msgs) in
     let rcp = GRPC.Client.client_stream_rpc t ~meth ?timeout f in
-    rcp |> Ocaml_protoc_plugin.Reader.create |> from_proto |> Result.get_ok
+    rcp |> Result.get_ok |> Ocaml_protoc_plugin.Reader.create |> from_proto
+    |> Result.get_ok
 
   let server_stream_rpc ?timeout t conv msg f =
     let meth, to_proto, from_proto =

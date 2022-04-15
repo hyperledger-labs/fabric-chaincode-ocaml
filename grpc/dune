@@ -1,7 +1,7 @@
 (library
  (name GRPC)
  (public_name grpc)
- (libraries memcpy)
+ (libraries ctypes memcpy)
  ; ctypes backward compatibility shims warn sometimes; suppress them
  (flags (:standard -w -9-27))
  (foreign_stubs (language c) (names grpc_stub))

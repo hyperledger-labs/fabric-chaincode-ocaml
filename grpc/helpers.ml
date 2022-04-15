@@ -2,7 +2,6 @@ open Core
 open Ctypes
 
 let () = grpc_init ()
-
 let () = at_exit (fun () -> grpc_shutdown ())
 
 let mk_timespec ?(sec = Int64.max_int) ?(nsec = Int32.zero) () =
@@ -13,7 +12,6 @@ let mk_timespec ?(sec = Int64.max_int) ?(nsec = Int32.zero) () =
   s
 
 exception QUEUE_SHUTDOWN
-
 exception TIMEOUT
 
 module Slice_buffer = struct
@@ -165,13 +163,14 @@ module Op = struct
     | SEND_CLOSE_FROM_CLIENT
     | SEND_STATUS_FROM_SERVER of {
         trailing_metadata : (string * string) list;
-        status : status_code_error option;
+        status_on_error : status_code_error option;
         status_details : string option;
       }
     | RECV_INITIAL_METADATA of (string * string) list ref
-    | RECV_MESSAGE of string ref
+    | RECV_MESSAGE of string option ref
     | RECV_STATUS_ON_CLIENT of {
         trailing_metadata : (string * string) list ref;
+        status_on_error : status_code_error option ref;
         status_details : string ref;
       }
     | RECV_CLOSE_ON_SERVER of { cancelled : bool ref }
@@ -233,7 +232,11 @@ module Op = struct
     in
     let recv = getf (getf op GRPC_op.data) GRPC_op.Data.recv_message in
     setf recv GRPC_op.Data.Recv_message.recv_message recv_message;
-    let filler () = rmsg := Byte_buffer.to_string !@(!@recv_message) in
+    let filler () =
+      if is_null !@recv_message then (* connection closing *)
+        rmsg := None
+      else rmsg := Some (Byte_buffer.to_string !@(!@recv_message))
+    in
     let cleanup () = grpc_byte_buffer_destroy !@recv_message in
     pre_post op ~filler ~cleanup
 
@@ -242,7 +245,8 @@ module Op = struct
     setf op GRPC_op.op GRPC_op_type.GRPC_OP_SEND_CLOSE_FROM_CLIENT;
     pre_post op ~cleanup:(fun () -> Cstubs_internals.use_value op)
 
-  let op_send_status_from_server ~trailing_metadata ~status ~status_details =
+  let op_send_status_from_server ~trailing_metadata ~status_on_error
+      ~status_details =
     let op = make GRPC_op.t in
     setf op GRPC_op.op GRPC_op_type.GRPC_OP_SEND_STATUS_FROM_SERVER;
     let data =
@@ -257,7 +261,7 @@ module Op = struct
         trailing_metadata
     in
     setf data GRPC_op.Data.Send_status_from_server.status
-      (to_grpc_status status);
+      (to_grpc_status status_on_error);
     let status_details =
       Option.map (fun sd -> slice_of_string sd) status_details
     in
@@ -337,11 +341,32 @@ module Op = struct
     | SEND_MESSAGE msg -> op_send_message msg
     | RECV_MESSAGE rmsg -> op_recv_message rmsg
     | SEND_CLOSE_FROM_CLIENT -> op_send_close_from_client ()
-    | SEND_STATUS_FROM_SERVER { trailing_metadata; status; status_details } ->
-        op_send_status_from_server ~trailing_metadata ~status ~status_details
+    | SEND_STATUS_FROM_SERVER
+        { trailing_metadata; status_on_error; status_details } ->
+        op_send_status_from_server ~trailing_metadata ~status_on_error
+          ~status_details
     | RECV_STATUS_ON_CLIENT { trailing_metadata; status_details } ->
         op_recv_status_on_client ~trailing_metadata ~status_details
     | RECV_CLOSE_ON_SERVER { cancelled } -> op_recv_close_on_server ~cancelled
+end
+
+module Status_on_client = struct
+  type t = {
+    trailing_metadata : (string * string) list;
+    status_on_error : Op.status_code_error option;
+    status_details : string;
+  }
+
+  let pp fmt t =
+    (match t.status_on_error with
+    | None -> Format.fprintf fmt "status ok"
+    | Some status ->
+        Format.fprintf fmt "@[status: %s (%s)@]"
+          (Op.show_status_code_error status)
+          t.status_details);
+    List.iter
+      (fun (k, v) -> Format.fprintf fmt "@[%s:%s@]" k v)
+      t.trailing_metadata
 end
 
 module Call = struct
@@ -381,35 +406,22 @@ module Call = struct
     type 'a t
 
     val send_initial_metadata : (string * string) list -> unit t
-
     val send_message : string -> unit t
-
     val send_close_from_client : unit t
 
     val send_status_from_server :
       ?trailing_metadata:(string * string) list ->
       ?status_details:string ->
-      ?status:Op.status_code_error ->
+      ?status_on_error:Op.status_code_error ->
       unit ->
       unit t
 
     val recv_initial_metadata : unit -> (string * string) list t
-
-    val recv_message : unit -> string t
-
-    type status_on_client = {
-      trailing_metadata : (string * string) list;
-      status_details : string;
-    }
-
-    val recv_status_on_client : unit -> status_on_client t
-
+    val recv_message : unit -> string option t
+    val recv_status_on_client : unit -> Status_on_client.t t
     val recv_close_on_server : unit -> bool t
-
     val timeout : int64 -> unit t
-
     val ( let> ) : 'a t -> ('a -> 'b) -> 'b
-
     val ( and> ) : 'a t -> 'b t -> ('a * 'b) t
   end
 
@@ -439,13 +451,13 @@ module Call = struct
         }
 
       let send_status_from_server ?(trailing_metadata = []) ?status_details
-          ?status () =
+          ?status_on_error () =
         {
           timeout = Int64.max_int;
           ops =
             [
               Op.SEND_STATUS_FROM_SERVER
-                { trailing_metadata; status_details; status };
+                { trailing_metadata; status_details; status_on_error };
             ];
           reader = (fun () -> ());
         }
@@ -459,31 +471,32 @@ module Call = struct
         }
 
       let recv_message () =
-        let l = ref "" in
+        let l = ref None in
         {
           timeout = Int64.max_int;
           ops = [ Op.RECV_MESSAGE l ];
           reader = (fun () -> !l);
         }
 
-      type status_on_client = {
-        trailing_metadata : (string * string) list;
-        status_details : string;
-      }
-
       let recv_status_on_client () =
         let trailing_metadata = ref [] in
         let status_details = ref "" in
+        let status_on_error = ref None in
         {
           timeout = Int64.max_int;
           ops =
-            [ Op.RECV_STATUS_ON_CLIENT { trailing_metadata; status_details } ];
+            [
+              Op.RECV_STATUS_ON_CLIENT
+                { trailing_metadata; status_on_error; status_details };
+            ];
           reader =
             (fun () ->
-              {
-                trailing_metadata = !trailing_metadata;
-                status_details = !status_details;
-              });
+              Status_on_client.
+                {
+                  trailing_metadata = !trailing_metadata;
+                  status_on_error = !status_on_error;
+                  status_details = !status_details;
+                });
         }
 
       let recv_close_on_server () =
@@ -574,16 +587,21 @@ module Server = struct
   let unary_rpc c f =
     let open (val Call.o c.call) in
     let> msg = recv_message () in
-    let rsp = f msg in
-    let> () = send_initial_metadata []
-    and> _ = recv_close_on_server ()
-    and> () = send_message rsp
-    and> () = send_status_from_server () in
-    ()
+    match msg with
+    | None ->
+        (* connection closed *)
+        let> _ = recv_close_on_server () and> () = send_status_from_server () in
+        ()
+    | Some msg ->
+        let rsp = f msg in
+        let> () = send_initial_metadata []
+        and> _ = recv_close_on_server ()
+        and> () = send_message rsp
+        and> () = send_status_from_server () in
+        ()
 
   type server_stream = string -> unit
-
-  type client_stream = unit -> string
+  type client_stream = unit -> string option
 
   let client_stream_rpc c (f : client_stream -> string) =
     let open (val Call.o c.call) in
@@ -605,7 +623,7 @@ module Server = struct
       ()
     in
     let> msg = recv_message () and> () = send_initial_metadata [] in
-    f msg server_stream;
+    Option.iter (fun msg -> f msg server_stream) msg;
     let> _ = recv_close_on_server () and> () = send_status_from_server () in
     ()
 
@@ -634,8 +652,6 @@ module Client = struct
 
   let destroy c = grpc_channel_destroy c.channel
 
-  type call_result = TIMEOUT | CALL
-
   let call ~meth ?timeout c =
     let meth = slice_of_string meth in
     let deadline = mk_timespec ?sec:timeout () in
@@ -656,11 +672,10 @@ module Client = struct
     let> _ = recv_initial_metadata ()
     and> rcp = recv_message ()
     and> status = recv_status_on_client () in
-    rcp
+    match rcp with None -> Error status | Some rcp -> Ok rcp
 
   type client_stream = string -> unit
-
-  type server_stream = unit -> string
+  type server_stream = unit -> string option
 
   let client_stream_rpc ~meth ?timeout c (f : client_stream -> unit) =
     let c = call ~meth ?timeout c in
@@ -674,9 +689,10 @@ module Client = struct
     let> () = send_close_from_client
     and> rcp = recv_message ()
     and> status = recv_status_on_client () in
-    rcp
+    match rcp with None -> Error status | Some rcp -> Ok rcp
 
-  let server_stream_rpc ~meth ?timeout c msg (f : server_stream -> 'a) : 'a =
+  let server_stream_rpc ~meth ?timeout c msg (f : server_stream -> 'a) :
+      'a * Status_on_client.t =
     let c = call ~meth ?timeout c in
     let open (val Call.o c) in
     let server_stream () =
@@ -688,11 +704,11 @@ module Client = struct
     and> _ = recv_initial_metadata ()
     and> () = send_close_from_client in
     let r = f server_stream in
-    let> _ = recv_status_on_client () in
-    r
+    let> status = recv_status_on_client () in
+    (r, status)
 
   let bidirectional_rpc ~meth ?timeout c
-      (f : client_stream -> server_stream -> 'a) : 'a =
+      (f : client_stream -> server_stream -> 'a) : 'a * Status_on_client.t =
     let c = call ~meth ?timeout c in
     let open (val Call.o c) in
     let first = ref true in
@@ -710,6 +726,6 @@ module Client = struct
     in
     let> () = send_initial_metadata [] in
     let r = f client_stream server_stream in
-    let> () = send_close_from_client and> _ = recv_status_on_client () in
-    r
+    let> () = send_close_from_client and> status = recv_status_on_client () in
+    (r, status)
 end
