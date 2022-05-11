@@ -10,11 +10,8 @@ module Functions (F : Ctypes.FOREIGN) = struct
   open Types
 
   let reserved = ptr void
-
   let tag = ptr void
-
   let grpc_init = foreign "grpc_init" (void @-> returning void)
-
   let grpc_shutdown = foreign "grpc_shutdown" (void @-> returning void)
 
   let grpc_version_string =
@@ -96,6 +93,11 @@ module Functions (F : Ctypes.FOREIGN) = struct
     foreign "grpc_insecure_channel_create"
     @@ string @-> ptr_opt grpc_channel_args @-> reserved
     @-> returning (ptr grpc_channel)
+
+  let grpc_channel_check_connectivity_state =
+    foreign "grpc_channel_check_connectivity_state"
+    @@ ptr grpc_channel @-> bool
+    @-> returning GRPC_connectivity_state.t
 
   let grpc_channel_destroy =
     foreign "grpc_channel_destroy" @@ ptr grpc_channel @-> returning void

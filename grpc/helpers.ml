@@ -652,14 +652,37 @@ module Client = struct
 
   let destroy c = grpc_channel_destroy c.channel
 
+  let check_ready_or_idle c =
+    match grpc_channel_check_connectivity_state c.channel true with
+    | GRPC_CHANNEL_IDLE -> ()
+    | GRPC_CHANNEL_CONNECTING -> invalid_arg "channel connecting"
+    | GRPC_CHANNEL_READY -> ()
+    | GRPC_CHANNEL_TRANSIENT_FAILURE -> invalid_arg "channel transient failure"
+    | GRPC_CHANNEL_SHUTDOWN -> invalid_arg "channel shutdown"
+
+  let check_ready c =
+    match grpc_channel_check_connectivity_state c.channel true with
+    | GRPC_CHANNEL_IDLE -> invalid_arg "channel idle"
+    | GRPC_CHANNEL_CONNECTING -> invalid_arg "channel connecting"
+    | GRPC_CHANNEL_READY -> ()
+    | GRPC_CHANNEL_TRANSIENT_FAILURE -> invalid_arg "channel transient failure"
+    | GRPC_CHANNEL_SHUTDOWN -> invalid_arg "channel shutdown"
+
   let call ~meth ?timeout c =
     let meth = slice_of_string meth in
     let deadline = mk_timespec ?sec:timeout () in
     let cq = grpc_completion_queue_create_for_next null in
+    check_ready_or_idle c;
     let call =
       grpc_channel_create_call c.channel None GRPC_propagate_bits.default cq
         meth None deadline null
     in
+    (match grpc_channel_check_connectivity_state c.channel false with
+    | GRPC_CHANNEL_IDLE -> ()
+    | GRPC_CHANNEL_CONNECTING -> ()
+    | GRPC_CHANNEL_READY -> ()
+    | GRPC_CHANNEL_TRANSIENT_FAILURE -> invalid_arg "channel transient failure"
+    | GRPC_CHANNEL_SHUTDOWN -> invalid_arg "channel shutdown");
     grpc_slice_unref meth;
     { Call.call; cq }
 
@@ -707,9 +730,9 @@ module Client = struct
     let> status = recv_status_on_client () in
     (r, status)
 
-  let bidirectional_rpc ~meth ?timeout c
+  let bidirectional_rpc ~meth ?timeout c0
       (f : client_stream -> server_stream -> 'a) : 'a * Status_on_client.t =
-    let c = call ~meth ?timeout c in
+    let c = call ~meth ?timeout c0 in
     let open (val Call.o c) in
     let first = ref true in
     let client_stream msg =
@@ -726,6 +749,7 @@ module Client = struct
       msg
     in
     let> () = send_initial_metadata [] in
+    check_ready c0;
     let r = f client_stream server_stream in
     let> () = send_close_from_client and> status = recv_status_on_client () in
     (r, status)
