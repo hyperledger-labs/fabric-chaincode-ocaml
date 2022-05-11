@@ -49,13 +49,9 @@ module Types (F : Ctypes.TYPE) = struct
     type t
 
     let t : t structure typ = typedef_structure "gpr_timespec"
-
     let tv_sec = field t "tv_sec" int64_t
-
     let tv_nsec = field t "tv_nsec" int32_t
-
     let clock_type = field t "clock_type" GPR_clock_type.t
-
     let () = seal t
   end
 
@@ -75,13 +71,9 @@ module Types (F : Ctypes.TYPE) = struct
     type t
 
     let t : t structure typ = typedef_structure "grpc_event"
-
     let type_ = field t "type" GRPC_completion_type.t
-
     let success = field t "success" int
-
     let tag = field t "tag" (ptr void)
-
     let () = seal t
   end
 
@@ -156,7 +148,6 @@ module Types (F : Ctypes.TYPE) = struct
     type t
 
     let t : t structure typ = typedef_structure "grpc_slice"
-
     let () = seal t
   end
 
@@ -164,13 +155,9 @@ module Types (F : Ctypes.TYPE) = struct
     type t
 
     let t : t structure typ = typedef_structure "grpc_slice_buffer"
-
     let slices = field t "slices" (ptr GRPC_slice.t)
-
     let count = field t "count" size_t
-
     let length = field t "length" size_t
-
     let () = seal t
   end
 
@@ -178,11 +165,8 @@ module Types (F : Ctypes.TYPE) = struct
     type t
 
     let t : t structure typ = typedef_structure "grpc_metadata"
-
     let key = field t "key" GRPC_slice.t
-
     let value = field t "value" GRPC_slice.t
-
     let () = seal t
   end
 
@@ -190,13 +174,9 @@ module Types (F : Ctypes.TYPE) = struct
     type t
 
     let t : t structure typ = typedef_structure "grpc_metadata_array"
-
     let count = field t "count" size_t
-
     let capacity = field t "capacity" size_t
-
     let metadata = field t "metadata" (ptr GRPC_metadata.t)
-
     let () = seal t
   end
 
@@ -204,15 +184,10 @@ module Types (F : Ctypes.TYPE) = struct
     type t
 
     let t : t structure typ = typedef_structure "grpc_call_details"
-
     let method_ = field t "method" GRPC_slice.t
-
     let host = field t "host" GRPC_slice.t
-
     let deadline = field t "deadline" GPR_timespec.t
-
     let flags = field t "flags" uint32_t
-
     let () = seal t
   end
 
@@ -300,7 +275,6 @@ module Types (F : Ctypes.TYPE) = struct
     type t
 
     let t : t structure typ = structure "grpc_byte_buffer"
-
     let type_ = field t "type" GRPC_byte_buffer_type.t
 
     module Data = struct
@@ -312,21 +286,16 @@ module Types (F : Ctypes.TYPE) = struct
         type t
 
         let t : t structure typ = structure "grpc_compressed_buffer"
-
         let compression = field t "compression" GRPC_compression_algorithm.t
-
         let slice_buffer = field t "slice_buffer" GRPC_slice_buffer.t
-
         let () = seal t
       end
 
       let raw = field t "raw" Compressed_buffer.t
-
       let () = seal t
     end
 
     let data = field t "data" Data.t
-
     let () = seal t
   end
 
@@ -387,9 +356,7 @@ module Types (F : Ctypes.TYPE) = struct
     type t
 
     let t : t structure typ = typedef_structure "grpc_op"
-
     let op = field t "op" GRPC_op_type.t
-
     let flags = field t "flags" uint32_t
 
     module Data = struct
@@ -401,9 +368,7 @@ module Types (F : Ctypes.TYPE) = struct
         type t
 
         let t : t structure typ = structure "grpc_op_send_initial_metadata"
-
         let count = field t "count" size_t
-
         let metadata = field t "metadata" (ptr GRPC_metadata.t)
 
         module Maybe_compression_level = struct
@@ -413,9 +378,7 @@ module Types (F : Ctypes.TYPE) = struct
             structure "grpc_op_send_initial_metadata_maybe_compression_level"
 
           let is_set = field t "is_set" uint8_t
-
           let level = field t "level" GRPC_compression_level.t
-
           let () = seal t
         end
 
@@ -432,9 +395,7 @@ module Types (F : Ctypes.TYPE) = struct
         type t
 
         let t : t structure typ = structure "grpc_op_send_message"
-
         let send_message = field t "send_message" (ptr GRPC_byte_buffer.t)
-
         let () = seal t
       end
 
@@ -444,16 +405,13 @@ module Types (F : Ctypes.TYPE) = struct
         type t
 
         let t : t structure typ = structure "grpc_op_send_status_from_server"
-
         let trailing_metadata_count = field t "trailing_metadata_count" size_t
 
         let trailing_metadata =
           field t "trailing_metadata" (ptr GRPC_metadata.t)
 
         let status = field t "status" GRPC_status_code.t
-
         let status_details = field t "status_details" (ptr_opt GRPC_slice.t)
-
         let () = seal t
       end
 
@@ -478,9 +436,7 @@ module Types (F : Ctypes.TYPE) = struct
         type t
 
         let t : t structure typ = structure "grpc_op_recv_message"
-
         let recv_message = field t "recv_message" (ptr (ptr GRPC_byte_buffer.t))
-
         let () = seal t
       end
 
@@ -495,11 +451,8 @@ module Types (F : Ctypes.TYPE) = struct
           field t "trailing_metadata" (ptr GRPC_metadata_array.t)
 
         let status = field t "status" (ptr GRPC_status_code.t)
-
         let status_details = field t "status_details" (ptr GRPC_slice.t)
-
         let error_string = field t "error_string" (ptr_opt (ptr char))
-
         let () = seal t
       end
 
@@ -510,9 +463,7 @@ module Types (F : Ctypes.TYPE) = struct
         type t
 
         let t : t structure typ = structure "grpc_op_recv_close_on_server"
-
         let cancelled = field t "cancelled" (ptr int)
-
         let () = seal t
       end
 
@@ -523,13 +474,11 @@ module Types (F : Ctypes.TYPE) = struct
     end
 
     let data = field t "data" Data.t
-
     let () = seal t
   end
 
   module GRPC_propagate_bits = struct
     let default = constant "GRPC_PROPAGATE_DEFAULTS" uint32_t
-
     let deadline = constant "GRPC_PROPAGATE_DEADLINE" uint32_t
 
     let census_stats_context =
@@ -540,5 +489,25 @@ module Types (F : Ctypes.TYPE) = struct
 
     let grpc_propagate_cancellation =
       constant "GRPC_PROPAGATE_CANCELLATION" uint32_t
+  end
+
+  module GRPC_connectivity_state = struct
+    type t =
+      | GRPC_CHANNEL_IDLE
+      | GRPC_CHANNEL_CONNECTING
+      | GRPC_CHANNEL_READY
+      | GRPC_CHANNEL_TRANSIENT_FAILURE
+      | GRPC_CHANNEL_SHUTDOWN
+
+    let t =
+      enum ~typedef:true "grpc_connectivity_state"
+        [
+          (GRPC_CHANNEL_IDLE, constant "GRPC_CHANNEL_IDLE" int64_t);
+          (GRPC_CHANNEL_CONNECTING, constant "GRPC_CHANNEL_CONNECTING" int64_t);
+          (GRPC_CHANNEL_READY, constant "GRPC_CHANNEL_READY" int64_t);
+          ( GRPC_CHANNEL_TRANSIENT_FAILURE,
+            constant "GRPC_CHANNEL_TRANSIENT_FAILURE" int64_t );
+          (GRPC_CHANNEL_SHUTDOWN, constant "GRPC_CHANNEL_SHUTDOWN" int64_t);
+        ]
   end
 end

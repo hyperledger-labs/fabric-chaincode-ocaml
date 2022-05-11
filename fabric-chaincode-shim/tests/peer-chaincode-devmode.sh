@@ -81,6 +81,8 @@ timeout 5 tail -f peer.log chaincode.log orderer.log || true
 
 cd $ORIGDIR
 
+
+# Kill the chaincode so that we can start our own
 kill %3
 
 bash

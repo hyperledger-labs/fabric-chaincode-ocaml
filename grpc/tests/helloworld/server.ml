@@ -12,14 +12,13 @@ let () =
   and> msg = recv_message ()
   and> () = timeout 5L in
   print_endline "wait_call 2 succeeded";
-  Printf.printf "msg: %s\n" msg;
+  Printf.printf "msg: %s\n" (Option.value ~default:"None" msg);
   let> () = send_message "Yes, I feel very connected"
   and> () = send_status_from_server ()
   and> () = timeout 5L in
   print_endline "wait_call 3 succeeded"
 
 let () = Server.destroy server
-
 let server = Server.create ~listening:"unix:socket" ()
 
 let () =

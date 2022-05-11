@@ -29,3 +29,8 @@
  (depends ctypes grpc ocaml-protoc-plugin)
  (synopsis "GRPC services using ocaml-protoc-plugin definitions")
 )
+
+(package
+ (name conf-libgrpc)
+ (allow_empty)
+)

@@ -13,14 +13,14 @@ let services =
     client_stream_rpc clientStreamingEcho' (fun msgs ->
         let b = Buffer.create 30 in
         for _ = 0 to 2 do
-          Buffer.add_string b (msgs ())
+          Buffer.add_string b (Option.value ~default:"None" (msgs ()))
         done;
         Buffer.contents b);
     server_stream_rpc serverStreamingEcho' (fun msg rcps ->
         String.iter (fun c -> rcps (String.make 1 c)) msg);
     bidirectional_stream_rpc bidirectionalStreamingEcho' (fun msgs rcps ->
         for _ = 0 to 2 do
-          rcps (msgs ())
+          rcps (Option.value ~default:"None" (msgs ()))
         done);
   ]
 
@@ -30,11 +30,7 @@ let serve () =
   GRPC_protoc_plugin.Server.serve c services
 
 let () = serve ()
-
 let () = serve ()
-
 let () = serve ()
-
 let () = serve ()
-
 let () = Server.destroy server
