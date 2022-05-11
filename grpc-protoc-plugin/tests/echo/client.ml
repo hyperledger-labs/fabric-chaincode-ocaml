@@ -1,5 +1,6 @@
 open GRPC
 
+let () = Unix.sleepf 0.1
 let target = if Array.length Sys.argv > 1 then Sys.argv.(1) else "unix:socket"
 let client = Client.create ~target ()
 

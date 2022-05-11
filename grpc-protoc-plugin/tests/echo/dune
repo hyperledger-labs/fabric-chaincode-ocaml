@@ -6,7 +6,7 @@
 
 (executable
  (name client)
- (libraries grpc echo grpc-protoc-plugin)
+ (libraries grpc echo grpc-protoc-plugin unix)
  (modules client)
 )
 
