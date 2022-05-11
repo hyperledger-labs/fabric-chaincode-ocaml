@@ -713,9 +713,10 @@ module Client = struct
     let open (val Call.o c) in
     let first = ref true in
     let client_stream msg =
-      if !first then
-        let> () = send_message msg and> _ = recv_initial_metadata () in
-        first := false
+      if !first then (
+        let> () = send_message msg and> l = recv_initial_metadata () in
+        List.iter (fun (k, v) -> Format.eprintf "%s -> %s@." k v) l;
+        first := false)
       else
         let> () = send_message msg in
         ()
