@@ -10,3 +10,5 @@
  (libraries fabric-chaincode-shim)
 
 )
+
+(data_only_dirs pkg)
