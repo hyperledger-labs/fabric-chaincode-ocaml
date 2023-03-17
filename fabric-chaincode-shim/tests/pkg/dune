@@ -1,0 +1,6 @@
+(executable
+ (public_name chaincode)
+ (name test)
+ (modules test)
+ (libraries fabric-chaincode-shim)
+)
